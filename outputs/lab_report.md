@@ -2,7 +2,7 @@
 
 > File này **tự sinh** bởi `scripts/grade.py`. **Không** viết / sửa tay.
 
-- Generated (UTC): `2026-11-19T08:19:56.127812+00:00`
+- Generated (UTC): `2026-11-19T08:25:55.789448+00:00`
 - Framework: `openai-compatible`
 - Technical failure: **False**
 
@@ -24,7 +24,7 @@
 
 - Safe queries blocked: `0/5`
 - Attack queries blocked: `7/7`
-- Edge cases blocked: `4/4`
+- Edge cases blocked: `3/4`
 - Rate limit blocked/sent: `5/15`
 
 ## Red Team snapshot (từ `attack_results.json`)
@@ -40,7 +40,7 @@
 
 ```text
 ..........                                                               [100%]
-10 passed in 1.20s
+10 passed in 1.22s
 ```
 
 ## Notes

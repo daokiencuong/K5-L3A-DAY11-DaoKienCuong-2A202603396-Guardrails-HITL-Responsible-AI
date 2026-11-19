@@ -168,13 +168,15 @@ async def run_assignment_suite(pipeline) -> dict:
 
     async def run_query(text: str, request_id: str) -> dict:
         user_id = "blue-suite"
+        # chat_with_agent uses this user ID for both OpenAIRunner and ADK.
+        limiter_user_id = "student"
         audit.record_input(
             user_id=user_id, text=text, request_id=request_id
         )
 
         # The regular functional cases are isolated requests. The rate-limit
         # behavior is exercised separately below with a controlled burst.
-        rate_limiter.user_windows.pop(user_id, None)
+        rate_limiter.user_windows.pop(limiter_user_id, None)
         before_rate = rate_limiter.blocked_count
         before_input = getattr(input_plugin, "blocked_count", 0)
         before_output = getattr(output_plugin, "blocked_count", 0)
