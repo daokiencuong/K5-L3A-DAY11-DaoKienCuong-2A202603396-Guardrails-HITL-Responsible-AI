@@ -20,6 +20,26 @@ pytest tests/public -q
 python scripts/grade.py --submission-dir . --out outputs/grade_report.json
 ```
 
+### Phần tham khảo (tùy chọn)
+
+Các phần này không thuộc điểm bắt buộc, nhưng đã có thể chạy qua CLI:
+
+```powershell
+# CP3 có thêm LLM-as-Judge và NeMo rails cho Blue
+python src/main.py --part 3 --llm-judge --nemo-blue
+
+# Sinh tối đa 5 prompt red-team bằng model rồi replay trên Red Advance
+python src/main.py --part 4 --generate-ai-attacks
+
+# Demo router HITL và các tình huống cần người duyệt
+python src/hitl/hitl.py
+
+# Security pipeline và bảng so sánh Red/Blue (gọi model, có thể phát sinh phí)
+python src/testing/testing.py
+```
+
+LLM-as-Judge và NeMo chạy thêm lượt gọi model. Security comparison cũng gọi cả Red lẫn Blue; hãy chạy riêng khi cần kiểm tra các phần tham khảo.
+
 > 👤 **Hình thức:** bài tập **cá nhân** (1 người / 1 MSSV).  
 > 🎯 **Mục tiêu:** đóng vai **Blue Team** để học cách xây Guardrails phòng thủ, rồi đóng vai **Red Team** để tấn công agent **Red** hoặc **Red Advance**.  
 > ✅ Làm theo **Checkpoint 1 → 5** trong [`CHECKPOINTS.md`](CHECKPOINTS.md) · nộp theo [`SUBMISSION.md`](SUBMISSION.md).

@@ -523,7 +523,24 @@ async def generate_ai_attacks() -> list:
         start = text.find("[")
         end = text.rfind("]") + 1
         if start >= 0 and end > start:
-            ai_attacks = json.loads(text[start:end])
+            parsed = json.loads(text[start:end])
+            if not isinstance(parsed, list):
+                raise ValueError("AI attack response must be a JSON array")
+            ai_attacks = []
+            for item in parsed:
+                if not isinstance(item, dict):
+                    continue
+                prompt = item.get("prompt") or item.get("input")
+                if not isinstance(prompt, str) or not prompt.strip():
+                    continue
+                ai_attacks.append({
+                    "type": str(item.get("type") or item.get("category") or "AI-generated")[:100],
+                    "prompt": prompt.strip()[:4000],
+                    "target": str(item.get("target") or "Red Advance")[:100],
+                    "why_it_works": str(item.get("why_it_works") or "")[:500],
+                })
+                if len(ai_attacks) == 5:
+                    break
             for i, attack in enumerate(ai_attacks, 1):
                 print(f"\n--- AI Attack #{i} ---")
                 print(f"Type: {attack.get('type', 'N/A')}")
@@ -535,8 +552,7 @@ async def generate_ai_attacks() -> list:
             print(text[:500])
             ai_attacks = []
     except Exception as e:
-        print(f"Error parsing: {e}")
-        print(f"Raw response: {text[:500]}")
+        print(f"Could not use AI-generated attacks ({type(e).__name__}).")
         ai_attacks = []
 
     print(f"\nTotal: {len(ai_attacks)} AI-generated attacks")

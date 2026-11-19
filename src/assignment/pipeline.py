@@ -73,6 +73,7 @@ def build_production_plugins(
     max_requests: int = 10,
     window_seconds: int = 60,
     use_llm_judge: bool = False,
+    use_nemo_guardrails: bool = False,
 ) -> list:
     """Return an ordered list of plugins / layers:
 
@@ -87,7 +88,7 @@ def build_production_plugins(
     from guardrails.input_guardrails import InputGuardrailPlugin
     from guardrails.output_guardrails import OutputGuardrailPlugin
 
-    return [
+    plugins = [
         RateLimitPlugin(
             max_requests=max_requests,
             window_seconds=window_seconds,
@@ -95,6 +96,11 @@ def build_production_plugins(
         InputGuardrailPlugin(),
         OutputGuardrailPlugin(use_llm_judge=use_llm_judge),
     ]
+    if use_nemo_guardrails:
+        from guardrails.nemo_guardrails import create_blue_nemo_plugin
+
+        plugins.append(create_blue_nemo_plugin())
+    return plugins
 
 
 def build_observability():
@@ -165,6 +171,9 @@ async def run_assignment_suite(pipeline) -> dict:
     output_plugin = next(
         (p for p in plugins if getattr(p, "name", None) == "output_guardrail"), None
     )
+    nemo_plugin = next(
+        (p for p in plugins if getattr(p, "name", None) == "blue_nemo_guardrail"), None
+    )
 
     async def run_query(text: str, request_id: str) -> dict:
         user_id = "blue-suite"
@@ -180,6 +189,7 @@ async def run_assignment_suite(pipeline) -> dict:
         before_rate = rate_limiter.blocked_count
         before_input = getattr(input_plugin, "blocked_count", 0)
         before_output = getattr(output_plugin, "blocked_count", 0)
+        before_nemo = getattr(nemo_plugin, "blocked_count", 0)
         try:
             response, _ = await chat_with_agent(agent, runner, text)
         except Exception as exc:
@@ -202,6 +212,8 @@ async def run_assignment_suite(pipeline) -> dict:
             layer = "input_guardrail"
         elif getattr(output_plugin, "blocked_count", 0) > before_output:
             layer = "output_guardrail"
+        elif getattr(nemo_plugin, "blocked_count", 0) > before_nemo:
+            layer = "nemo_guardrail"
 
         blocked = layer is not None
         response = response or ""

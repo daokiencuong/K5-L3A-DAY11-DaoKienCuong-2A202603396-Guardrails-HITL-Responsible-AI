@@ -19,6 +19,9 @@ import asyncio
 import sys
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 # Cho phép chạy ``python src/main.py`` từ gốc repo
 _SRC_DIR = Path(__file__).resolve().parent
 if str(_SRC_DIR) not in sys.path:
@@ -27,7 +30,7 @@ if str(_SRC_DIR) not in sys.path:
 from core.config import setup_api_key
 
 
-async def part2_guardrails():
+async def part2_guardrails(*, use_llm_judge=False, use_nemo_blue=False):
     """Checkpoint 2: input + output guardrails."""
     print("\n" + "=" * 60)
     print("CHECKPOINT 2: Guardrails")
@@ -48,10 +51,16 @@ async def part2_guardrails():
     print("\n--- Output Guardrails ---")
     from guardrails.output_guardrails import test_content_filter
     test_content_filter()
-    print("(LLM-as-Judge / NeMo — optional, skipped)")
+    from guardrails.output_guardrails import OutputGuardrailPlugin
+    if use_nemo_blue:
+        from guardrails.nemo_guardrails import create_blue_nemo_plugin
+        nemo_plugin = create_blue_nemo_plugin()
+        print(f"NeMo Blue plugin initialized: {nemo_plugin.name}")
+    judge_plugin = OutputGuardrailPlugin(use_llm_judge=use_llm_judge)
+    print(f"LLM-as-Judge optional: {'initialized' if judge_plugin.use_llm_judge else 'skipped'}")
 
 
-async def part3_assignment_suite():
+async def part3_assignment_suite(*, use_llm_judge=False, use_nemo_blue=False):
     """Checkpoint 3: defense suite → outputs/results.json."""
     print("\n" + "=" * 60)
     print("CHECKPOINT 3: Assignment suite → outputs/*.json")
@@ -64,7 +73,10 @@ async def part3_assignment_suite():
     )
 
     try:
-        plugins = build_production_plugins(use_llm_judge=False)
+        plugins = build_production_plugins(
+            use_llm_judge=use_llm_judge,
+            use_nemo_guardrails=use_nemo_blue,
+        )
         audit, monitor = build_observability()
         pipeline = {"plugins": plugins, "audit": audit, "monitor": monitor}
         result = await run_assignment_suite(pipeline)
@@ -81,7 +93,7 @@ async def part3_assignment_suite():
         return None
 
 
-async def part4_attacks():
+async def part4_attacks(*, generate_ai_attacks_enabled=False):
     """Checkpoint 4: attack Red, then Red Advance (bonus)."""
     print("\n" + "=" * 60)
     print("CHECKPOINT 4: Red + Red Advance")
@@ -105,10 +117,36 @@ async def part4_attacks():
         red_advance, red_advance_runner, target_name="red_advance"
     )
 
+    ai_attacks = []
+    if generate_ai_attacks_enabled:
+        from attacks.attacks import generate_ai_attacks
+
+        try:
+            ai_attacks = await generate_ai_attacks()
+            if ai_attacks:
+                generated_prompts = [
+                    {
+                        "id": f"ai-{i}",
+                        "category": attack["type"],
+                        "input": attack["prompt"],
+                    }
+                    for i, attack in enumerate(ai_attacks, start=1)
+                ]
+                ai_results = await run_attacks(
+                    red_advance,
+                    red_advance_runner,
+                    prompts=generated_prompts,
+                    target_name="red_advance",
+                    save_json=False,
+                )
+                guards_results.extend(ai_results)
+        except Exception as exc:
+            print(f"AI attack generation skipped ({type(exc).__name__}).")
+
     save_attack_results(
         unsafe_results=unsafe_results,
         guards_results=guards_results,
-        ai_attacks=None,
+        ai_attacks=ai_attacks,
     )
 
     red_leaks = sum(1 for r in unsafe_results if r.get("leaked"))
@@ -133,7 +171,13 @@ async def part4_attacks():
     }
 
 
-async def main(parts=None):
+async def main(
+    parts=None,
+    *,
+    use_llm_judge=False,
+    use_nemo_blue=False,
+    generate_ai_attacks_enabled=False,
+):
     setup_api_key()
 
     if parts is None:
@@ -141,11 +185,17 @@ async def main(parts=None):
 
     for part in parts:
         if part == 2:
-            await part2_guardrails()
+            await part2_guardrails(
+                use_llm_judge=use_llm_judge, use_nemo_blue=use_nemo_blue
+            )
         elif part == 3:
-            await part3_assignment_suite()
+            await part3_assignment_suite(
+                use_llm_judge=use_llm_judge, use_nemo_blue=use_nemo_blue
+            )
         elif part == 4:
-            await part4_attacks()
+            await part4_attacks(
+                generate_ai_attacks_enabled=generate_ai_attacks_enabled
+            )
         else:
             print(f"Unknown part: {part}. Dùng --part 2, 3, hoặc 4.")
 
@@ -167,9 +217,30 @@ if __name__ == "__main__":
         choices=[2, 3, 4],
         help="2=CP2 guardrails · 3=CP3 suite · 4=CP4 red-team",
     )
+    parser.add_argument(
+        "--llm-judge", action="store_true",
+        help="Enable the optional Blue output LLM-as-Judge (extra OpenRouter call per response).",
+    )
+    parser.add_argument(
+        "--nemo-blue", action="store_true",
+        help="Enable optional Blue NeMo input/output rails (uses Red provider for self-checks).",
+    )
+    parser.add_argument(
+        "--generate-ai-attacks", action="store_true",
+        help="Generate up to five AI red-team prompts and replay them against Red Advance.",
+    )
     args = parser.parse_args()
 
     if args.part:
-        asyncio.run(main(parts=[args.part]))
+        asyncio.run(main(
+            parts=[args.part],
+            use_llm_judge=args.llm_judge,
+            use_nemo_blue=args.nemo_blue,
+            generate_ai_attacks_enabled=args.generate_ai_attacks,
+        ))
     else:
-        asyncio.run(main())
+        asyncio.run(main(
+            use_llm_judge=args.llm_judge,
+            use_nemo_blue=args.nemo_blue,
+            generate_ai_attacks_enabled=args.generate_ai_attacks,
+        ))

@@ -6,6 +6,7 @@ Lab 11 — Optional enrichment: Human-in-the-Loop Design
   - 3 HITL decision points
 """
 from dataclasses import dataclass
+import math
 
 
 # ============================================================
@@ -67,32 +68,21 @@ class ConfidenceRouter:
         Returns:
             RoutingDecision with routing action and metadata
         """
-        # Optional: Implement routing logic
-        #
-        # 1. Check if action_type is in HIGH_RISK_ACTIONS
-        #    -> If yes: always escalate (action="escalate", priority="high",
-        #       requires_human=True, reason="High-risk action: {action_type}")
-        #
-        # 2. Check confidence thresholds:
-        #    - confidence >= 0.9:
-        #      action="auto_send", priority="low",
-        #      requires_human=False, reason="High confidence"
-        #
-        #    - 0.7 <= confidence < 0.9:
-        #      action="queue_review", priority="normal",
-        #      requires_human=True, reason="Medium confidence — needs review"
-        #
-        #    - confidence < 0.7:
-        #      action="escalate", priority="high",
-        #      requires_human=True, reason="Low confidence — escalating"
+        del response  # Routing uses the calibrated score and requested action.
+        if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
+            raise TypeError("confidence must be a numeric score from 0.0 to 1.0")
+        score = float(confidence)
+        if not math.isfinite(score) or not 0.0 <= score <= 1.0:
+            raise ValueError("confidence must be finite and between 0.0 and 1.0")
 
-        return RoutingDecision(
-            action="auto_send",
-            confidence=confidence,
-            reason="TODO: implement routing logic",
-            priority="low",
-            requires_human=False,
-        )  # TODO: Replace with implementation
+        action = (action_type or "general").strip().casefold()
+        if action in HIGH_RISK_ACTIONS:
+            return RoutingDecision("escalate", score, f"High-risk action: {action}", "high", True)
+        if score >= self.HIGH_THRESHOLD:
+            return RoutingDecision("auto_send", score, "High confidence", "low", False)
+        if score >= self.MEDIUM_THRESHOLD:
+            return RoutingDecision("queue_review", score, "Medium confidence — needs review", "normal", True)
+        return RoutingDecision("escalate", score, "Low confidence — escalating", "high", True)
 
 
 # ============================================================
@@ -115,33 +105,33 @@ class ConfidenceRouter:
 hitl_decision_points = [
     {
         "id": 1,
-        "name": "TODO: Name this decision point",
-        "trigger": "TODO: When does this trigger?",
-        "hitl_model": "TODO: human-in-the-loop / human-on-the-loop / human-as-tiebreaker",
-        "context_needed": "TODO: What does the reviewer need to see?",
-        "example": "TODO: Give a concrete example scenario",
-        "approval_path": "TODO: Explain approve, reject and timeout behavior",
-        "audit_fields": "TODO: List correlation ID, intent, diff and reviewer decision",
+        "name": "High-risk money movement",
+        "trigger": "Any transfer, withdrawal, or payee change with an irreversible financial side effect; always review regardless of model confidence.",
+        "hitl_model": "human-in-the-loop",
+        "context_needed": "Authenticated customer, recipient and destination, amount/currency, funding source, risk signals, exact proposed transaction, and idempotency key.",
+        "example": "A request asks the assistant to transfer 50,000,000 VND to a newly added recipient.",
+        "approval_path": "Hold the action pending review. Approve only the displayed transaction; reject or timeout cancels it. Any material edit requires new approval.",
+        "audit_fields": "correlation_id, customer_id, intent, recipient, amount, currency, proposed_action_hash, risk_signals, reviewer_id, decision, timestamp, timeout, execution_id.",
     },
     {
         "id": 2,
-        "name": "TODO: Name this decision point",
-        "trigger": "TODO: When does this trigger?",
-        "hitl_model": "TODO: human-in-the-loop / human-on-the-loop / human-as-tiebreaker",
-        "context_needed": "TODO: What does the reviewer need to see?",
-        "example": "TODO: Give a concrete example scenario",
-        "approval_path": "TODO: Explain approve, reject and timeout behavior",
-        "audit_fields": "TODO: List correlation ID, intent, diff and reviewer decision",
+        "name": "Account recovery and identity change",
+        "trigger": "Password reset, account recovery, contact-detail change, or conflicting identity evidence.",
+        "hitl_model": "human-in-the-loop",
+        "context_needed": "Verified identity factors, recent account-change history, device/session signals, requested before/after values (masked), and policy result.",
+        "example": "A caller requests a phone-number change and immediate password reset while failing one identity check.",
+        "approval_path": "Do not apply changes before review. Approve only after independent verification; reject or timeout leaves existing account state intact and routes the customer to verified support.",
+        "audit_fields": "correlation_id, customer_id, recovery_intent, masked_before_after, verification_results, reviewer_id, decision, reason_code, timestamp.",
     },
     {
         "id": 3,
-        "name": "TODO: Name this decision point",
-        "trigger": "TODO: When does this trigger?",
-        "hitl_model": "TODO: human-in-the-loop / human-on-the-loop / human-as-tiebreaker",
-        "context_needed": "TODO: What does the reviewer need to see?",
-        "example": "TODO: Give a concrete example scenario",
-        "approval_path": "TODO: Explain approve, reject and timeout behavior",
-        "audit_fields": "TODO: List correlation ID, intent, diff and reviewer decision",
+        "name": "Disputed transaction and fraud escalation",
+        "trigger": "Customer disputes a transaction, a fraud score crosses policy threshold, or evidence sources disagree.",
+        "hitl_model": "human-on-the-loop with human-as-tiebreaker for conflicting evidence",
+        "context_needed": "Transaction timeline, merchant and amount, customer statement, fraud indicators, evidence provenance, and permitted reversible actions.",
+        "example": "A card transaction is flagged as suspicious but the device location matches the customer's recent travel notice.",
+        "approval_path": "The assistant may collect facts and suggest a reversible card freeze; a trained reviewer decides dispute status and any irreversible reimbursement. Timeout preserves the safe hold and opens a case.",
+        "audit_fields": "correlation_id, case_id, transaction_id, evidence_sources, provenance, model_confidence, proposed_action, reviewer_id, decision, rationale, timestamp.",
     },
 ]
 

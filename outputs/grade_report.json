@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-19T08:25:55.789448+00:00",
+  "generated_at": "2026-11-19T14:51:40.210835+00:00",
   "submission_dir": "C:\\Users\\daoki\\main_dkc\\ai_in_action_vinuni\\Day_11\\K5-L3A-DaoKienCuong-2A202603396-Guardrails-HITL-Responsible-AI",
   "technical_failure": false,
   "packaging": {
@@ -42,12 +42,12 @@
       "unsafe_leaks": 5,
       "unsafe_total": 5,
       "guards_leaks": 0,
-      "guards_total": 5
+      "guards_total": 10
     }
   },
   "public_tests": {
     "returncode": 0,
-    "stdout": "..........                                                               [100%]\n10 passed in 1.22s\n",
+    "stdout": "..........                                                               [100%]\n10 passed in 1.53s\n",
     "stderr": "",
     "technical_failure": false
   },
