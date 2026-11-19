@@ -217,7 +217,7 @@ Mở các file dưới đây, đọc hướng dẫn trong file, rồi **điền 
 
 
 
-#### Việc 3 — Gắn filter vào plugin Input (trước LLM)
+#### Việc 3 — Gắn filter vào plugin Input (trước LLM) 
 
 - **Cùng file:** class `InputGuardrailPlugin`
 - **Làm gì:** Trong callback, lấy text user → gọi `detect_injection` + `topic_filter` → nếu status `"BLOCK"` thì trả message chặn (không gọi LLM); nếu cả hai `"ALLOW"` thì `return None` (cho qua).
